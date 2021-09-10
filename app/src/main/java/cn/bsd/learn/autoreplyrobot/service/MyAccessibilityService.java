@@ -8,44 +8,22 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
 import cn.bsd.learn.autoreplyrobot.utils.HttpUtils;
 
 public class MyAccessibilityService extends AccessibilityService {
+    private static final String TAG = "MyAccessibilityService";
 
-    private static final List<String> messageList = new ArrayList<>();
-    private static final Random sRandom = new Random(messageList.size());
+    private Random mRandom = new Random();
 
-    private long sendTime;
-
-    static {
-        messageList.add("你好呀？");
-        messageList.add("吃了吗？");
-        messageList.add("几点睡？");
-        messageList.add("哪的人啊？");
-        messageList.add("我也是");
-        messageList.add("好巧啊");
-        messageList.add("你住哪啊？");
-        messageList.add("我也在附近");
-        messageList.add("出来吃饭啊");
-        messageList.add("看个电影也行啊");
-        messageList.add("出去兜风啊");
-        messageList.add("一个人没意思");
-        messageList.add("恐怖片不敢看");
-        messageList.add("你玩游戏吗？");
-        messageList.add("我玩王者");
-        messageList.add("你玩什么");
-        messageList.add("吃鸡吗？");
-        messageList.add("带飞不了");
-        messageList.add("自己瞎玩吧");
-    }
 
     /**
      * 1、获取到聊天内容
@@ -61,7 +39,20 @@ public class MyAccessibilityService extends AccessibilityService {
         int eventType = event.getEventType();
         switch (eventType) {
             case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
-//            case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
+//                //微信有新消息
+//                List<CharSequence> texts = event.getText();
+//                if(!texts.isEmpty()) {
+//                    for (CharSequence text : texts) {
+//                        String content = text.toString();
+//                        if(!TextUtils.isEmpty(content)){
+//                            //可以获取到用户的消息内容了userName:content
+//                            //跳转到微信的聊天页面
+//                            sendNotificationReply(event);
+//                        }
+//                    }
+//                }
+//                    break;
+//                case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
                 //窗口状态变更
                 //3、找到输入框输入需要回复的内容
                 //获取页面节点信息
@@ -70,17 +61,19 @@ public class MyAccessibilityService extends AccessibilityService {
         }
     }
 
+    private long time;
+
     private void fill() {
-        int time = sRandom.nextInt(10 * 1000);
-        if (System.currentTimeMillis() - sendTime < time) {
+        Log.d(TAG, "fill:------------------- " + System.currentTimeMillis());
+        if (System.currentTimeMillis() - time < mRandom.nextInt(300) + 500) {
             return;
         }
-        sendTime = System.currentTimeMillis();
+        time = System.currentTimeMillis();
+        Log.d(TAG, "fill: " + (time));
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             //判断收到的消息（去选择回复什么消息）
-            String message = messageList.get(sRandom.nextInt(messageList.size()));
-            if (findEditText(rootNode, message)) {
+            if (findEditText(rootNode, "老子不想理你")) {
                 //找到发送按钮，点击
                 send();
             }
@@ -97,7 +90,6 @@ public class MyAccessibilityService extends AccessibilityService {
                 for (AccessibilityNodeInfo nodeInfo : list) {
                     if (nodeInfo.isEnabled()) {
                         nodeInfo.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        return;
                     }
                 }
             } else {
@@ -113,7 +105,7 @@ public class MyAccessibilityService extends AccessibilityService {
         }
         //返回到主界面
 //        backToHome();
-
+//        extracted();
     }
 
     private void backToHome() {
@@ -151,8 +143,52 @@ public class MyAccessibilityService extends AccessibilityService {
         return false;
     }
 
+    private void sendNotificationReply(AccessibilityEvent event) {
+
+        if (event.getParcelableData() != null && event.getParcelableData() instanceof Notification) {
+            //获取到通知栏
+            Notification notification = (Notification) event.getParcelableData();
+            //获取消息内容
+            String content = notification.tickerText.toString();
+            //数据拆分userName:content
+            int index = content.indexOf(":");
+//            name = content.substring(0, index);
+//            contents = content.substring(index + 1);
+            //跳转到微信的聊天页面
+            PendingIntent contentIntent = notification.contentIntent;
+            try {
+                contentIntent.send();
+            } catch (PendingIntent.CanceledException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     @Override
     public void onInterrupt() {
 
+    }
+
+    class MyTask extends AsyncTask {
+
+        @Override
+        protected Object doInBackground(Object[] objects) {
+            //网络请求
+
+            return "这里填自己的id";
+        }
+
+        @Override
+        protected void onPostExecute(Object o) {
+            AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+            if (rootNode != null) {
+                //判断收到的消息（去选择回复什么消息）
+                if (findEditText(rootNode, o != null ? o.toString() : "老子不想理你")) {
+                    //找到发送按钮，点击
+                    send();
+                }
+            }
+            super.onPostExecute(o);
+        }
     }
 }
